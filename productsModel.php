@@ -3,7 +3,7 @@ class productModel {
     public $conexion;
 
     public function __construct() {
-        $this->conexion = new mysqli('127.0.0.1', 'root', '', 'distrimedicasd');
+        $this->conexion = new mysqli('localhost', 'root', '', 'distrimedicasd');
         mysqli_set_charset($this->conexion, 'utf8');
     }
 
