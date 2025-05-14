@@ -1,3 +1,3 @@
 <?php
-echo "Aplicación PHP funcionando correctamente";
-?>
+
+include 'productsController.php';
