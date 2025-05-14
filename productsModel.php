@@ -1,70 +1,103 @@
-<?php  
+<?php
 class productModel {
     public $conexion;
 
     public function __construct() {
-        $this->conexion = new mysqli('localhost', 'root', '', 'distrimedicasd');
-        mysqli_set_charset($this->conexion, 'utf8');
+        $host = 'dpg-d0iemm7diees738h6990-a';       // Reemplaza esto con tu Host real
+        $db   = 'distrimedicasd';           // Nombre de la base de datos
+        $user = 'admin';               // Usuario de la DB
+        $pass = 'gZ8mo0XmBU6X4E2OmFFm7m8FsFBZlnyC';            // Contraseña segura
+        $port = '5432';                     // Puerto (por defecto 5432)
+
+        try {
+            $this->conexion = new PDO("pgsql:host=$host;port=$port;dbname=$db", $user, $pass);
+            $this->conexion->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        } catch (PDOException $e) {
+            die("Error de conexión: " . $e->getMessage());
+        }
     }
 
     public function getProducts($product_id = null) {
-        $where = ($product_id == null) ? "" : " WHERE product_id='$product_id'";
-        $products = [];
-        $sql = "SELECT * FROM product " . $where;
-        $registros = mysqli_query($this->conexion, $sql);
-        while ($row = mysqli_fetch_assoc($registros)) {
-            array_push($products, $row);
+        $sql = "SELECT * FROM product";
+        if ($product_id !== null) {
+            $sql .= " WHERE product_id = :product_id";
         }
-        return $products;
+
+        $stmt = $this->conexion->prepare($sql);
+        if ($product_id !== null) {
+            $stmt->bindParam(':product_id', $product_id, PDO::PARAM_INT);
+        }
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
     public function saveProduct($name, $description, $category, $expiration_date, $price) {
         $valida = $this->validateProduct($name, $description, $category, $expiration_date, $price);
-        $resultado = ['error', 'A product with the same details already exists'];
-        if (count($valida) == 0) {
-            $sql = "INSERT INTO product(name, description, category, expiration_date, price) 
-                    VALUES('$name', '$description', '$category', '$expiration_date', '$price')";
-            mysqli_query($this->conexion, $sql);
-            $resultado = ['success', 'Product saved successfully'];
+        if (count($valida) > 0) {
+            return ['error', 'A product with the same details already exists'];
         }
-        return $resultado;
+
+        $sql = "INSERT INTO product (name, description, category, expiration_date, price)
+                VALUES (:name, :description, :category, :expiration_date, :price)";
+        $stmt = $this->conexion->prepare($sql);
+        $stmt->execute([
+            ':name' => $name,
+            ':description' => $description,
+            ':category' => $category,
+            ':expiration_date' => $expiration_date,
+            ':price' => $price
+        ]);
+        return ['success', 'Product saved successfully'];
     }
 
     public function updateProduct($product_id, $name, $description, $category, $expiration_date, $price) {
         $existe = $this->getProducts($product_id);
-        $resultado = ['error', 'No product found with ID ' . $product_id];
-        if (count($existe) > 0) {
-            $valida = $this->validateProduct($name, $description, $category, $expiration_date, $price);
-            $resultado = ['error', 'A product with the same details already exists'];
-            if (count($valida) == 0) {
-                $sql = "UPDATE product SET name='$name', description='$description', category='$category', 
-                        expiration_date='$expiration_date', price='$price' WHERE product_id='$product_id'";
-                mysqli_query($this->conexion, $sql);
-                $resultado = ['success', 'Product updated successfully'];
-            }
+        if (count($existe) == 0) {
+            return ['error', 'No product found with ID ' . $product_id];
         }
-        return $resultado;
+
+        $valida = $this->validateProduct($name, $description, $category, $expiration_date, $price);
+        if (count($valida) > 0) {
+            return ['error', 'A product with the same details already exists'];
+        }
+
+        $sql = "UPDATE product SET name = :name, description = :description, category = :category,
+                expiration_date = :expiration_date, price = :price WHERE product_id = :product_id";
+        $stmt = $this->conexion->prepare($sql);
+        $stmt->execute([
+            ':product_id' => $product_id,
+            ':name' => $name,
+            ':description' => $description,
+            ':category' => $category,
+            ':expiration_date' => $expiration_date,
+            ':price' => $price
+        ]);
+        return ['success', 'Product updated successfully'];
     }
 
     public function deleteProduct($product_id) {
-        $valida = $this->getProducts($product_id);
-        $resultado = ['error', 'No product found with ID ' . $product_id];
-        if (count($valida) > 0) {
-            $sql = "DELETE FROM product WHERE product_id='$product_id'";
-            mysqli_query($this->conexion, $sql);
-            $resultado = ['success', 'Product deleted successfully'];
+        $existe = $this->getProducts($product_id);
+        if (count($existe) == 0) {
+            return ['error', 'No product found with ID ' . $product_id];
         }
-        return $resultado;
+
+        $sql = "DELETE FROM product WHERE product_id = :product_id";
+        $stmt = $this->conexion->prepare($sql);
+        $stmt->execute([':product_id' => $product_id]);
+        return ['success', 'Product deleted successfully'];
     }
 
     public function validateProduct($name, $description, $category, $expiration_date, $price) {
-        $products = [];
-        $sql = "SELECT * FROM product WHERE name='$name' AND description='$description' 
-                AND category='$category' AND expiration_date='$expiration_date' AND price='$price'";
-        $registros = mysqli_query($this->conexion, $sql);
-        while ($row = mysqli_fetch_assoc($registros)) {
-            array_push($products, $row);
-        }
-        return $products;
+        $sql = "SELECT * FROM product WHERE name = :name AND description = :description AND category = :category
+                AND expiration_date = :expiration_date AND price = :price";
+        $stmt = $this->conexion->prepare($sql);
+        $stmt->execute([
+            ':name' => $name,
+            ':description' => $description,
+            ':category' => $category,
+            ':expiration_date' => $expiration_date,
+            ':price' => $price
+        ]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 }
